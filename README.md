@@ -1,3 +1,3 @@
 # TradeStation
 
-Chaque commit permet d'accéder à une certaine partie du code à un certain moment donné
+Les fichiers où il n'y pas d'extension .ELD sont ceux où il y a le code
