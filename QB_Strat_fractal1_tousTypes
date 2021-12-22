@@ -1,0 +1,457 @@
+Inputs : 
+	P1((4*C+H+L)/6),
+	L1(5),
+	stdDevLength(50),
+	stdDevFactor(1),
+	Length(125), 
+	StochLength( 21 ), 
+	SmoothingLength1( 21 ), 
+	SmoothingLength2( 5 ), 
+	SmoothingType( 2 ),
+	stoploss(25000),
+	stratType(0);		// 0 = filtre : moving average, 1 = filtre : stoc et moving average, 2 = seules possibilités de prise : inversion de bearish à bullish ou deux points blancs égaux 
+						// 3 = pas de filtres, 4 = filtre : moving average et reset deux points blancs
+						// 5 = filtre : moving average et stoc, reset deux points blancs
+						
+vars : 	
+	ma(0),	
+	maa1(0),
+	maa2(0),
+	maa(0),
+	Li(0),	
+	Le(0),
+	upperEnvelopeLine(0),
+	lowerEnvelopeLine(0),
+	upperEnvelopeLine1(0),
+	lowerEnvelopeLine1(0),
+	bullPower(0),
+	bearPower(0),
+	maxPower(0),
+	percentPenetration(0),
+	stdDevToUse(0),
+	count(0),
+	N(0),
+	N1(0),
+	N2(0),
+	N3(0),
+	M(0),
+	M1(0),
+	M2(0),
+	M3(0),
+	HH(0),
+	LL(0),
+	Dimen(0),
+	alpha(0),
+	FiltLi(0),
+	FiltLe(0),
+	dernier_indice(0),
+	state("bearish"),
+	xAv(0),  
+	strat(1), 
+	ind(0), 
+	j(0),
+	short_prise(False), 
+	long_prise(False),
+	nbreshares(0),
+	oFastK( 0 ), 
+	oFastD( 0 ), 
+	oSlowK( 0 ), 
+	oSlowD( 0 ),
+	stoc(0),
+	pLong(0),
+	pShort(0);
+
+/////////////////////////////////////////////////////////////////
+		
+//CALCUL DES ENVELOPPES POUR LE STOPLOSS ET PRISE DE POSITION	
+	
+/////////////////////////////////////////////////////////////////
+
+Le = L1;
+Li=2;
+N=Li;
+M=Le;
+
+N3 = (Highest(High, N) - Lowest(Low, N)) / N;
+HH = High;
+LL = Low;
+For count = 0 to N / 2 - 1 begin
+	If High[count] > HH then HH = High[count];
+	If Low[count] < LL then LL = Low[count];
+End;
+N1 = (HH - LL) / (N / 2);
+HH = High[N / 2];
+LL = Low[N / 2];
+For count = N/2 to N - 1 begin
+	If High[count] > HH then HH = High[count];
+	If Low[count] < LL then LL = Low[count];
+End;
+N2 = (HH - LL) / (N / 2);
+If N1 > 0 and  N2 > 0 and N3 > 0 then Dimen = (Log(N1 + N2) - Log(N3)) / Log(2);
+alpha = ExpValue(-4.6*(Dimen - 1));
+If alpha < .01 then alpha = .01;
+If alpha > 1 then alpha = 1;
+
+FiltLi = alpha*P1  + (1 - alpha)*FiltLi[1];
+If CurrentBar < N + 1 then FiltLi = P1 ;
+
+
+M3 = (Highest(High, M) - Lowest(Low, M)) / M;
+For count = 0 to M / 2 - 1 begin
+	If High[count] > HH then HH = High[count];
+	If Low[count] < LL then LL = Low[count];
+End;
+M1 = (HH - LL) / (M / 2);
+HH = High[M / 2];
+LL = Low[M / 2];
+For count = M/2 to M - 1 begin
+	If High[count] > HH then HH = High[count];
+	If Low[count] < LL then LL = Low[count];
+End;
+N2 = (HH - LL) / (M / 2);
+If M1 > 0 and  M2 > 0 and M3 > 0 then Dimen = (Log(M1 + M2) - Log(M3)) / Log(2);
+alpha = ExpValue(-4.6*(Dimen - 1));
+If alpha < .01 then alpha = .01;
+If alpha > 1 then alpha = 1;
+
+FiltLe = alpha*P1  + (1 - alpha)*FiltLe[1];
+If CurrentBar < M + 1 then FiltLe = P1 ;
+
+maa1 = (AdaptiveMovAvg( P1 ,Li, Li, Li)+ 2*filtLi)/3;
+maa2 = (AdaptiveMovAvg( P1 ,Le, Le, Le)+ 2*filtLe)/3;
+ma = AdaptiveMovAvg((maa1+maa2)/2,Le,Le,Le);
+									//xaverage et adaptativemovavg sont linéaires
+bullPower = absValue(high-ma);
+bearPower = absValue(low-ma);
+maxPower = maxList(bullPower, bearPower);
+percentPenetration = maxPower / ma;
+stdDevToUse = AdaptiveMovAvg(stdDevS(percentPenetration, stdDevLength),Le,Le,Le);
+upperEnvelopeLine = AdaptiveMovAvg(ma* (1+(stdDevFactor*stdDevToUse)),Le,Le,Le);
+lowerEnvelopeLine = AdaptiveMovAvg(ma* (1-(stdDevFactor*stdDevToUse)),Le,Le,Le);
+upperEnvelopeLine1 = AdaptiveMovAvg(ma* (1+(stdDevFactor/4*stdDevToUse)),Le,Le,Le);
+lowerEnvelopeLine1 = AdaptiveMovAvg(ma* (1-(stdDevFactor/4*stdDevToUse)),Le,Le,Le);
+
+
+/////////////////////////////////////////////////////////////////
+
+//calcul de l'état du marché (blanc au dessus de rouge ou inversement)
+
+/////////////////////////////////////////////////////////////////
+
+
+dernier_indice = 0;
+
+if  P1<=lowerEnvelopeLine then  
+	state = "bearish";
+
+if  P1>upperEnvelopeLine then
+	state = "bullish";
+
+if P1>lowerEnvelopeLine and P1<=upperEnvelopeLine then Begin
+	while P1[dernier_indice] > lowerEnvelopeLine[dernier_indice] and P1[dernier_indice] <= upperEnvelopeLine[dernier_indice] and dernier_indice < 20 Begin
+		dernier_indice  = dernier_indice + 1;
+		if P1[dernier_indice] <= lowerEnvelopeLine[dernier_indice] Then
+			state = "bearish";
+			lowerEnvelopeLine1 = lowerEnvelopeLine1[dernier_indice];
+		if P1[dernier_indice] > upperEnvelopeLine[dernier_indice] Then
+			state = "bullish";
+			upperEnvelopeLine1 = upperEnvelopeLine1[dernier_indice];
+	end;
+end;
+
+
+
+
+/////////////////////////////////////////////////////////////////
+
+//Ajout de la condition de prise ou pas détaillée dans l'excel
+
+/////////////////////////////////////////////////////////////////
+
+stoc = Stochastic(High, Low, Close, StochLength, SmoothingLength1, SmoothingLength2, SmoothingType, oFastK, oFastD, oSlowK, oSlowD);
+xAv = xaverage ((Highest (High,Length)+Lowest (Low, Length))/2,(Length));	
+	
+
+/////////////////////////////////////////////////////////////////
+
+//stratType = 0, filtre xAv
+
+///////////////////////////////////////////////////////////////// LONG
+
+if stratType = 0 then Begin
+
+	pLong = pLong[1];
+	long_prise = False;						
+	
+	if Low <= lowerEnvelopeLine1[dernier_indice + 1] Then
+		pLong = 0;
+	
+	if Close >= upperEnvelopeLine[dernier_indice] and state = "bullish" then Begin
+		if Close >= xAv then Begin
+			if pLong = 0 Then
+				long_prise = True;
+		end
+		else 
+			pLong = 1;
+	end;
+	
+///////////////////////////////////////////////////////////////////////////// SHORT
+	
+	pShort = pShort[1];	
+	short_prise = False;		//permet de faire une sorte de variable globale, qui peut changer à chaque bar
+	
+	if High >= upperEnvelopeLine1[dernier_indice + 1] Then
+		pShort = 0;
+	
+	
+	if Close <= lowerEnvelopeLine[dernier_indice] and state = "bearish" then Begin
+		if Close <= xAv then Begin
+			if pShort = 0 Then
+				short_prise = True;
+		end
+		else
+			pShort = 1;
+	end;
+
+end;
+
+
+/////////////////////////////////////////////////////////////////
+
+//stratType = 1, filtre xAv et stoc
+
+///////////////////////////////////////////////////////////////// LONG
+
+if stratType = 1 then Begin
+
+	pLong = pLong[1];		
+	long_prise = False;						
+		
+	if Low <= lowerEnvelopeLine1[dernier_indice + 1] Then
+		pLong = 0;
+	
+	if Close >= upperEnvelopeLine[dernier_indice] and state = "bullish" then Begin
+		if Close >= xAv and oSlowK > oSlowD then Begin
+			if pLong = 0 Then
+				long_prise = True;
+		end
+		else 
+			pLong = 1;
+	end;
+	
+///////////////////////////////////////////////////////////////////////////// SHORT
+	
+	pShort = pShort[1];	
+	short_prise = False;		
+	
+	if High >= upperEnvelopeLine1[dernier_indice + 1] Then
+		pShort = 0;
+	
+	if Close <= lowerEnvelopeLine[dernier_indice] and state = "bearish" then Begin
+		if Close <= xAv and oSlowK < oslowD then Begin
+			if pShort = 0 Then
+				short_prise = True;
+		end
+		else
+			pShort = 1;
+	end;
+
+end;
+
+
+/////////////////////////////////////////////////////////////////
+
+//stratType = 2, seules possibilités de prise : inversion de bearish à bullish ou deux points blancs égaux 
+
+/////////////////////////////////////////////////////////////////
+
+			//si on garde close > upperEnvelopeLine sans le [dernier_indice] les résultats sont très bons pour le corn, à voir 
+
+if stratType = 2 then Begin
+
+
+	if state = "bullish" and oSlowK >= oSlowD and Close > xAv and close > upperEnvelopeLine[dernier_indice] Then Begin
+		long_prise = False;
+		if dernier_indice[1] > 0 Then 
+			long_prise = True;
+		if state = "bullish" and state[1] = "bearish" Then
+			long_prise = True;
+	end;
+	
+	
+	if state = "bearish" and oslowK <= oslowD and Close < xAv and Close < lowerEnvelopeLine[dernier_indice] Then Begin
+		short_prise = False;
+		if dernier_indice[1] > 0 Then 
+			short_prise = True;
+		if state = "bearish" and state[1] = "bullish" Then
+			short_prise = True;
+	end;
+	
+	
+end;
+
+
+
+/////////////////////////////////////////////////////////////////
+
+//stratType = 3, pas de filtres 
+
+/////////////////////////////////////////////////////////////////
+
+ 
+if stratType = 3 then Begin
+	
+	long_prise = False;
+	if state = "bullish" and Close > xAv and close > upperEnvelopeLine[dernier_indice] and oSlowK > oslowD Then
+		long_prise = True;
+	
+	
+	short_prise = False;
+	if state = "bearish" and Close < xAv and Close < lowerEnvelopeLine[dernier_indice] and oSlowK < oslowD Then
+		short_prise = True;
+
+
+end;
+
+
+/////////////////////////////////////////////////////////////////
+
+//stratType = 4, filtre xAv et reset avec deux points blancs égaux
+
+///////////////////////////////////////////////////////////////// LONG
+
+if stratType = 4 then Begin
+
+	pLong = pLong[1];
+	long_prise = False;						
+	
+	if Low <= lowerEnvelopeLine1[dernier_indice + 1] Then
+		pLong = 0;
+	if dernier_indice > 0 Then
+		pLong = 0;
+	
+	if Close >= upperEnvelopeLine[dernier_indice] and state = "bullish" then Begin
+		if Close >= xAv then Begin
+			if pLong = 0 Then
+				long_prise = True;
+		end
+		else 
+			pLong = 1;
+	end;
+	
+///////////////////////////////////////////////////////////////////////////// SHORT
+	
+	pShort = pShort[1];	
+	short_prise = False;		//permet de faire une sorte de variable globale, qui peut changer à chaque bar
+	
+	if High >= upperEnvelopeLine1[dernier_indice + 1] Then
+		pShort = 0;
+	if dernier_indice > 0 Then
+		pShort = 0;
+	
+	
+	if Close <= lowerEnvelopeLine[dernier_indice] and state = "bearish" then Begin
+		if Close <= xAv then Begin
+			if pShort = 0 Then
+				short_prise = True;
+		end
+		else
+			pShort = 1;
+	end;
+
+end;
+
+
+/////////////////////////////////////////////////////////////////
+
+//stratType = 5, filtre xAv et stoc, reset avec deux points blancs égaux
+
+///////////////////////////////////////////////////////////////// LONG
+
+if stratType = 5 then Begin
+
+	pLong = pLong[1];
+	long_prise = False;						
+	
+	if Low <= lowerEnvelopeLine1[dernier_indice + 1] and state = "bullish" Then
+		pLong = 0;
+	if Low <= lowerEnvelopeLine[dernier_indice] and state = "bearish" Then
+		pLong = 0;
+	if dernier_indice > 0 Then
+		pLong = 0;
+	
+	if Close >= upperEnvelopeLine[dernier_indice] and state = "bullish" then Begin
+		if Close >= xAv and oSlowK > oSlowD then Begin
+			if pLong = 0 Then
+				long_prise = True;
+		end
+		else 
+			pLong = 1;
+	end;
+	
+///////////////////////////////////////////////////////////////////////////// SHORT
+	
+	pShort = pShort[1];	
+	short_prise = False;		//permet de faire une sorte de variable globale, qui peut changer à chaque bar
+	
+	if High >= upperEnvelopeLine1[dernier_indice + 1] and state = "bearish" Then
+		pShort = 0;
+	if High >= upperEnvelopeLine[dernier_indice] and state = "bullish" Then
+		pShort = 0;
+	if dernier_indice > 0 Then
+		pShort = 0;
+	
+	
+	if Close <= lowerEnvelopeLine[dernier_indice] and state = "bearish" then Begin
+		if Close <= xAv and oSlowK < oSlowD then Begin
+			if pShort = 0 Then
+				short_prise = True;
+		end
+		else
+			pShort = 1;
+	end;
+
+end;
+
+
+
+/////////////////////////////////////////////////////////////////
+
+//LONG
+
+/////////////////////////////////////////////////////////////////
+
+
+
+
+if long_prise = True Then Begin
+	if Marketposition = -1 Then
+		buytocover ("pour long") this bar on close;
+	if Marketposition = 0 Then
+		buy (stoploss/((Close - lowerEnvelopeLine1[dernier_indice + 1])*Bigpointvalue)) Shares this bar on close;
+
+end;
+ 
+sell ("stop long 2") next bar at lowerEnvelopeLine1[dernier_indice + 1] Stop;
+
+
+
+
+/////////////////////////////////////////////////////////////////
+	
+//SHORT
+
+/////////////////////////////////////////////////////////////////	
+
+if short_prise = True Then Begin
+	if Marketposition = 1 Then
+		sell ("pour short") this bar on close;
+	if Marketposition = 0 Then Begin
+		sellshort ((stoploss/((upperEnvelopeLine1[dernier_indice + 1] - Close)*Bigpointvalue))) Shares this bar on close;
+	end;
+end;
+
+Buytocover ("stop short 2") next bar at upperEnvelopeLine1[dernier_indice + 1] Stop; 
+
+	
+
