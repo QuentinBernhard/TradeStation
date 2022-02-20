@@ -1,0 +1,44 @@
+inputs: 
+		NumATRs(2),
+		Length(100), 
+		L1(25), 
+		rsilvl(8),
+		e1(.5), 
+		Ptarget(.5),
+		dollarsMax(25000);
+		
+		
+variables:  
+		AvgChange(0),
+		shift(0),
+		shrs(0);		
+		
+
+shift = NumATRs * AvgTrueRange( Length);		//Keltner envelope size
+shrs = dollarsMax/(shift*Bigpointvalue);		//Calculation of position's size with a max loss of dollarsMax and Bigpointvalue is the value in dollars of a contract   
+
+AvgChange= xaverage(absvalue(rsi((4*c+h+l)/6,L1*L1)-50),L1);		//-50 lets you have 0 as the baseline
+
+if  AvgChange<AvgChange[1] and AvgChange > rsilvl then begin
+	If close = highest(close,l1) and (h-c)/(c-o +0.00001) < e1 and ((4*c+h+l)/6)[1] > ((4*c+h+l)/6)[2] then 
+		sellshort shrs shares next bar at open;
+end;
+
+{Comments : 
+	close = highest(close, l1) lets you know if we have a peak
+	h-c/(c-o + 0.000001) is the ratio between the tail and the core of the candle
+	Same for the long 
+}	
+
+if 	AvgChange<AvgChange[1] and AvgChange > rsilvl then begin
+	If close = lowest(close,l1) and (c-l)/(0-c +0.00001) < e1 and ((4*c+h+l)/6)[1] < ((4*c+h+l)/6)[2] then 
+		buy shrs shares next bar at open;
+end;
+
+
+Setstopcontract;								//setstopcontract is an easylanguage reserved word that lets you have a stop at a certain loss size rather than a market level
+Setstoploss(shift*Bigpointvalue);                      
+SetProfitTarget (shift*Ptarget*Bigpointvalue);
+
+
+     
