@@ -1,6 +1,6 @@
 inputs: 
-		NumATRs(2),
-		Length(100), 
+		NumATRs(2),				//coefficient to change the width of the enveloppe
+		Length(100), 			//length of the Keltner xAverage
 		L1(25), 
 		rsilvl(8),
 		e1(.5), 
