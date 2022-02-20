@@ -1,0 +1,34 @@
+inputs: 
+	EntryC(25), 
+	Ptarget(1.5),  
+	NumATRs (2.5), 			//coefficient to change the width of the enveloppe
+	Length(50), 			//length of the Keltner xAverage
+	stoploss(25000); 
+
+vars: 
+	price(0), 
+	price1(0), 
+	shift(0), 
+	sl(0),
+	shrs(0);
+
+Price = xaverage ((Highest (High,EntryC)+Lowest (low, EntryC))/2,(EntryC));
+Price1 = (High + Low)/2; 
+shift = NumATRs * AvgTrueRange( Length ); 	//Keltner envelope size
+shrs = stoploss/(shift*Bigpointvalue);		//Calculation of position's size with a max loss of dollarsMax and Bigpointvalue is the value in dollars of a contract
+
+
+If ((high[0]<high[1] and low[0]>low[1] and C[0]>C[1] )) = false then begin 
+	if c<highest(high,EntryC)[1] and Price1>price then 			//highest(high,EntryC)[1] = highest high during the EntryC period excluding today's bar
+		Buy shrs Shares next bar highest(high,EntryC) stop; 
+end;
+
+If ((low[0]>low[1] and high[0]<high[1] and C[0]<C[1] )) = false then begin 
+	if c>lowest(low,EntryC)[1] and Price1<price then 			//lowest(low,EntryC)[1] = lowest low during the EntryC period excluding today's bar
+		Sellshort shrs Shares next bar lowest(low,EntryC) stop; 
+end;
+
+SetStopContract;
+SetStopLoss (shift*Bigpointvalue);				
+SetProfitTarget (shift*Ptarget*Bigpointvalue);
+
