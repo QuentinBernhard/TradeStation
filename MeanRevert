@@ -1,7 +1,7 @@
 inputs: 
-		NumATRs(2),				//coefficient to change the width of the enveloppe
-		Length(100), 			//length of the Keltner xAverage
-		L1(25), 
+		NumATRs(1,2),				//coefficient to change the width of the enveloppe
+		Length(40), 			//length of the Keltner xAverage
+		L1(5), 
 		rsilvl(8),
 		e1(.5), 
 		Ptarget(.5),
@@ -41,4 +41,6 @@ Setstoploss(shift*Bigpointvalue);
 SetProfitTarget (shift*Ptarget*Bigpointvalue);
 
 
+
+//For bitcoin daily : Profit Ratio = 0,55, % of winning trades = 93
      
