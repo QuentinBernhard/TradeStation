@@ -1,9 +1,9 @@
 inputs: 
 	EntryC(25), 
 	Ptarget(1.5),  
-	NumATRs (2.5), 			//coefficient to change the width of the enveloppe
-	Length(50), 			//length of the Keltner xAverage
-	stoploss(25000); 
+	NumATRs (0.3), 			//coefficient to change the width of the enveloppe
+	Length(40), 			//length of the Keltner xAverage
+	stoploss(25000);
 
 vars: 
 	price(0), 
@@ -31,4 +31,7 @@ end;
 SetStopContract;
 SetStopLoss (shift*Bigpointvalue);				
 SetProfitTarget (shift*Ptarget*Bigpointvalue);
+
+
+//With these inputs on Bitcoin daily for 4 years : profit ratio = 1,33; 53% of winning trades 
 
