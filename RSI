@@ -1,0 +1,30 @@
+inputs: 
+	Price( numericseries ), 
+	Length( numericsimple ) ; 
+
+variables:
+	NetChgAvg( 0 ), 
+	TotChgAvg( 0 ), 
+	Change( 0 ), 
+	SF( 1 / Length ), { smoothing factor }
+	ChgRatio( 0 ) ;
+
+if CurrentBar = 1 then
+	begin
+	NetChgAvg = ( Price - Price[Length] ) / Length ;
+	TotChgAvg = Average( AbsValue( Price - Price[1] ), Length ) ;
+	end
+else
+	begin
+	Change = Price - Price[1] ;
+	NetChgAvg = NetChgAvg[1] + SF * ( Change - NetChgAvg[1] ) ;
+	TotChgAvg = TotChgAvg[1] + SF * ( AbsValue( Change ) - TotChgAvg[1] ) ;
+	end ;
+
+if TotChgAvg <> 0 then
+	ChgRatio = NetChgAvg / TotChgAvg 
+else
+	ChgRatio = 0 ;
+
+RSI = 50 * ( ChgRatio + 1 ) ;
+
