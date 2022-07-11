@@ -1,0 +1,26 @@
+mkt = Marketposition;
+	
+pfe1 = PFE( Close, PFE_Length, false );
+
+if mkt = 0 and AvgChange < AvgChange[1] and AvgChange > rsilvl and pfe1 > 0 then
+  sellshort shrs shares next bar on open;
+
+
+if pfe1 < -60 Then
+  Buytocover this bar on close;
+
+  
+if mkt = 0 and AvgChange < AvgChange[1] and AvgChange > rsilvl  and pfe1 < 0 then
+  buy shrs shares next bar on open;
+
+
+if pfe1 > 60  Then
+  sell this bar on close;
+
+
+
+
+Setstopcontract;
+Setstoploss(shift[Barssinceentry]*Bigpointvalue);                        
+SetProfitTarget (shift[Barssinceentry]*Ptarget*Bigpointvalue);
+	
