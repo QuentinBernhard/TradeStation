@@ -1,0 +1,35 @@
+
+  
+inputs:
+	double Price( numericseries ), { price used in the calculations }
+	int Length( numericsimple ), { number of bars over which the efficiency is
+	 calculated }
+	bool UseAdjustedBaseLength( truefalsesimple ) ; { if true, then the number of 
+	 bars over which the price change occurred is the value of the Length input 
+	 minus one;  if false, then the number of bars over which the price change
+	 occurred is the value of the Length input } 
+	
+variables:
+	int BaseLength( 0 ),
+	double Path1( 0 ),
+	double Path2( 0 ),
+	double FractalEff( 0 ) ;
+
+if UseAdjustedBaseLength = false then
+	BaseLength = Length
+else
+	BaseLength = Length - 1 ;
+		
+{ calculate the straight-line distance between the two price points }
+Path1 = SquareRoot( Square( Price - Price[Length-1] ) + Square( BaseLength ) ) ;
+
+{ calculate the amount of price movement that actually occurred as price moved 
+ between the two price points as price moved bar to bar }
+Path2 = Summation( SquareRoot( Square( Price - Price[1] ) + 1 ), Length - 1 ) ;
+
+{ calculate the fractal efficiency of the price movement between the two price 
+  points }
+FractalEff = Sign( Price - Price[Length-1] ) * Path1 / Path2 * 100 ;
+
+{ assign function return value }
+PFE = FractalEff ;
